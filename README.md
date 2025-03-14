@@ -29,3 +29,7 @@ Tips:
 * Type "PR#3" to enable 80 column text mode and "PR#0" to go back to 40 columns.
 * Type "GR" to henter LoRes graphics mode and "TEXT" to go back.
 
+Links:
+* [Blog: Apple IIc Emulator](https://kobolt.github.io/article-251.html)
+* [YouTube: Apple IIc Emulator for the Linux Terminal](https://www.youtube.com/watch?v=qiS9BPXTqXg)
+
