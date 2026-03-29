@@ -27,7 +27,8 @@ static void debugger_help(void)
   fprintf(stdout, "  c               - Continue\n");
   fprintf(stdout, "  s               - Step\n");
   fprintf(stdout, "  w               - Warp Mode Toggle\n");
-  fprintf(stdout, "  f <file> [type] - Load Floppy Disk Image\n");
+  fprintf(stdout, "  f <file> [type] - Load Floppy Disk Image in Drive #1\n");
+  fprintf(stdout, "  g <file> [type] - Load Floppy Disk Image in Drive #2\n");
   fprintf(stdout, "  t               - Dump CPU Trace\n");
   fprintf(stdout, "  d <addr> [end]  - Dump Main RAM\n");
   fprintf(stdout, "  a <addr> [end]  - Dump Auxiliary RAM\n");
@@ -106,6 +107,20 @@ bool debugger(w65c02_t *cpu, mem_t *mem, iwm_t *iwm)
         }
       } else if (argc >= 2) {
         if (iwm_disk_load(iwm, 0, argv[1], 0) != 0) {
+          fprintf(stdout, "Loading of disk image '%s' failed!\n", argv[1]);
+        }
+      } else {
+        fprintf(stdout, "Missing argument!\n");
+      }
+
+    } else if (strncmp(argv[0], "g", 1) == 0) {
+      if (argc >= 3) {
+        sscanf(argv[2], "%d", &value1);
+        if (iwm_disk_load(iwm, 1, argv[1], value1) != 0) {
+          fprintf(stdout, "Loading of disk image '%s' failed!\n", argv[1]);
+        }
+      } else if (argc >= 2) {
+        if (iwm_disk_load(iwm, 1, argv[1], 0) != 0) {
           fprintf(stdout, "Loading of disk image '%s' failed!\n", argv[1]);
         }
       } else {

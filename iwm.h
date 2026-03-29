@@ -20,6 +20,11 @@ typedef enum {
 
 typedef struct disk_s {
   bool loaded;
+  int ph0_energy;
+  int ph1_energy;
+  int ph2_energy;
+  int ph3_energy;
+  int stepper_pos;
   int track_n;
   uint8_t volume_no;
   disk_interleave_t interleave;
@@ -40,11 +45,6 @@ typedef struct iwm_s {
   uint8_t data;
   uint8_t status;
   uint8_t handshake;
-  int ph0_energy;
-  int ph1_energy;
-  int ph2_energy;
-  int ph3_energy;
-  int stepper_pos;
   disk_t disk[2];
 } iwm_t;
 

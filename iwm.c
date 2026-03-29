@@ -109,6 +109,10 @@ static void disk_load_track(iwm_t *iwm, int disk_no, int track_no)
   uint8_t yy;
   int offset;
 
+  if (track_no >= DISK_TRACKS) {
+    return; /* Track out of range, ignore request. */
+  }
+
   for (sector_no = 0; sector_no < DISK_SECTORS; sector_no++) {
     /* Address Field Prologue */
     iwm->disk[disk_no].track[byte_no++] = 0xD5;
@@ -190,6 +194,90 @@ static uint8_t disk_spin_and_read(iwm_t *iwm, int disk_no)
 
 
 
+static void disk_step(iwm_t *iwm, int disk_no)
+{
+  int prev_track = iwm->disk[disk_no].stepper_pos / 2;
+
+  /* Simulate build-up of energy in the drive stepper motor phases. */
+  if (iwm->ph0) {
+    iwm->disk[disk_no].ph0_energy++;
+  } else {
+    iwm->disk[disk_no].ph0_energy = 0;
+  }
+  if (iwm->ph1) {
+    iwm->disk[disk_no].ph1_energy++;
+  } else {
+    iwm->disk[disk_no].ph1_energy = 0;
+  }
+  if (iwm->ph2) {
+    iwm->disk[disk_no].ph2_energy++;
+  } else {
+    iwm->disk[disk_no].ph2_energy = 0;
+  }
+  if (iwm->ph3) {
+    iwm->disk[disk_no].ph3_energy++;
+  } else {
+    iwm->disk[disk_no].ph3_energy = 0;
+  }
+
+  /* Simulate movement of drive stepper motor. */
+  switch (iwm->disk[disk_no].stepper_pos % 4) {
+  case 0:
+    if (iwm->disk[disk_no].ph0_energy == 0) {
+      if (iwm->disk[disk_no].ph1_energy > 1000) {
+        iwm->disk[disk_no].stepper_pos++;
+      } else if (iwm->disk[disk_no].ph3_energy > 1000) {
+        iwm->disk[disk_no].stepper_pos--;
+        if (iwm->disk[disk_no].stepper_pos < 0) {
+          iwm->disk[disk_no].stepper_pos = 0;
+        }
+      }
+    }
+    break;
+
+  case 1:
+    if (iwm->disk[disk_no].ph1_energy == 0) {
+      if (iwm->disk[disk_no].ph2_energy > 1000) {
+        iwm->disk[disk_no].stepper_pos++;
+      } else if (iwm->disk[disk_no].ph0_energy > 1000) {
+        iwm->disk[disk_no].stepper_pos--;
+      }
+    }
+    break;
+
+  case 2:
+    if (iwm->disk[disk_no].ph2_energy == 0) {
+      if (iwm->disk[disk_no].ph3_energy > 1000) {
+        iwm->disk[disk_no].stepper_pos++;
+      } else if (iwm->disk[disk_no].ph1_energy > 1000) {
+        iwm->disk[disk_no].stepper_pos--;
+      }
+    }
+    break;
+
+  case 3:
+    if (iwm->disk[disk_no].ph3_energy == 0) {
+      if (iwm->disk[disk_no].ph0_energy > 1000) {
+        iwm->disk[disk_no].stepper_pos++;
+      } else if (iwm->disk[disk_no].ph2_energy > 1000) {
+        iwm->disk[disk_no].stepper_pos--;
+      }
+    }
+    break;
+  }
+
+  /* Change track if the stepper motor has moved and it is enabled. */
+  if (iwm->motor_on) {
+    if (prev_track != iwm->disk[disk_no].stepper_pos / 2) {
+      iwm_trace("[E] D%d, T%d -> T%d\n", disk_no, prev_track,
+      iwm->disk[disk_no].stepper_pos / 2);
+      disk_load_track(iwm, disk_no, iwm->disk[disk_no].stepper_pos / 2);
+    }
+  }
+}
+
+
+
 static void iwm_switch(iwm_t *iwm, uint16_t address)
 {
   switch (address) {
@@ -257,17 +345,13 @@ static uint8_t iwm_read(void *iwm, uint16_t address)
   }
 
   if (((iwm_t *)iwm)->l6 == false && ((iwm_t *)iwm)->l7 == false) {
-    if (((iwm_t *)iwm)->motor_on == false) {
-      return 0xFF;
+    disk_no = ((iwm_t *)iwm)->drive_select ? 1 : 0;
+    if (((iwm_t *)iwm)->disk[disk_no].loaded) {
+      ((iwm_t *)iwm)->data = disk_spin_and_read(iwm, disk_no);
+      iwm_trace("[R] Data=0x%02x\n", ((iwm_t *)iwm)->data);
+      return ((iwm_t *)iwm)->data;
     } else {
-      disk_no = ((iwm_t *)iwm)->drive_select ? 1 : 0;
-      if (((iwm_t *)iwm)->disk[disk_no].loaded) {
-        ((iwm_t *)iwm)->data = disk_spin_and_read(iwm, disk_no);
-        iwm_trace("[R] Data=0x%02x\n", ((iwm_t *)iwm)->data);
-        return ((iwm_t *)iwm)->data;
-      } else {
-        return 0xFF;
-      }
+      return 0xFF;
     }
 
   } else if (((iwm_t *)iwm)->l6 == false && ((iwm_t *)iwm)->l7 == true) {
@@ -278,7 +362,7 @@ static uint8_t iwm_read(void *iwm, uint16_t address)
     ((iwm_t *)iwm)->status = 0;
     ((iwm_t *)iwm)->status |= (((iwm_t *)iwm)->mode & 0x1F);
     ((iwm_t *)iwm)->status |= (((iwm_t *)iwm)->motor_on << 5);
-    /* iwm_trace("[R] Status=0x%02x\n", ((iwm_t *)iwm)->status); */
+    iwm_trace("[R] Status=0x%02x\n", ((iwm_t *)iwm)->status);
     return ((iwm_t *)iwm)->status;
   }
 
@@ -332,82 +416,11 @@ void iwm_init(iwm_t *iwm, mem_t *mem)
 
 void iwm_execute(iwm_t *iwm)
 {
-  int prev_track = iwm->stepper_pos / 2;
+  int disk_no;
 
-  /* Simulate build-up of energy in the drive stepper motor phases. */
-  if (iwm->ph0) {
-    iwm->ph0_energy++;
-  } else {
-    iwm->ph0_energy = 0;
-  }
-  if (iwm->ph1) {
-    iwm->ph1_energy++;
-  } else {
-    iwm->ph1_energy = 0;
-  }
-  if (iwm->ph2) {
-    iwm->ph2_energy++;
-  } else {
-    iwm->ph2_energy = 0;
-  }
-  if (iwm->ph3) {
-    iwm->ph3_energy++;
-  } else {
-    iwm->ph3_energy = 0;
-  }
-
-  /* Simulate movement of drive stepper motor. */
-  switch (iwm->stepper_pos % 4) {
-  case 0:
-    if (iwm->ph0_energy == 0) {
-      if (iwm->ph1_energy > 1000) {
-        iwm->stepper_pos++;
-      } else if (iwm->ph3_energy > 1000) {
-        iwm->stepper_pos--;
-        if (iwm->stepper_pos < 0) {
-          iwm->stepper_pos = 0;
-        }
-      }
-    }
-    break;
-
-  case 1:
-    if (iwm->ph1_energy == 0) {
-      if (iwm->ph2_energy > 1000) {
-        iwm->stepper_pos++;
-      } else if (iwm->ph0_energy > 1000) {
-        iwm->stepper_pos--;
-      }
-    }
-    break;
-
-  case 2:
-    if (iwm->ph2_energy == 0) {
-      if (iwm->ph3_energy > 1000) {
-        iwm->stepper_pos++;
-      } else if (iwm->ph1_energy > 1000) {
-        iwm->stepper_pos--;
-      }
-    }
-    break;
-
-  case 3:
-    if (iwm->ph3_energy == 0) {
-      if (iwm->ph0_energy > 1000) {
-        iwm->stepper_pos++;
-      } else if (iwm->ph2_energy > 1000) {
-        iwm->stepper_pos--;
-      }
-    }
-    break;
-  }
-
-  /* Change track if the stepper motor has moved and it is enabled. */
-  if (iwm->motor_on) {
-    if (prev_track != iwm->stepper_pos / 2) {
-      iwm_trace("[E] T%d -> T%d\n", prev_track, iwm->stepper_pos / 2);
-      disk_load_track(iwm, 0, iwm->stepper_pos / 2);
-    }
+  disk_no = iwm->drive_select ? 1 : 0;
+  if (iwm->disk[disk_no].loaded) {
+    disk_step(iwm, disk_no);
   }
 }
 
@@ -518,7 +531,7 @@ int iwm_disk_load(iwm_t *iwm, int disk_no, const char *filename,
   }
 
   /* Load T0 now since there will initially be no track change detected. */
-  disk_load_track(iwm, 0, 0);
+  disk_load_track(iwm, disk_no, 0);
 
   iwm->disk[disk_no].loaded = true;
   return 0;

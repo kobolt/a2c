@@ -18,7 +18,6 @@ Features:
 Known issues and missing features:
 * Floppy write not implemented, meaning all IWM data writes will be ignored.
 * HiRes graphics are recognized and displayed in curses but too blocky to be useful.
-* Second external floppy drive not supported.
 * IRQ handling is missing.
 * No sound or game (joystick) input.
 * Apple IIc specific RAM expansion not supported.
@@ -28,6 +27,10 @@ Tips:
 * F1 is mapped to the "RESET" key, use it to enter Applesoft BASIC if no floppy disk image is loaded.
 * Type "PR#3" to enable 80 column text mode and "PR#0" to go back to 40 columns.
 * Type "GR" to henter LoRes graphics mode and "TEXT" to go back.
+
+Verson history:
+* 0.1 - Initial version.
+* 0.2 - Secondary floppy drive support.
 
 Links:
 * [Blog: Apple IIc Emulator](https://kobolt.github.io/article-251.html)

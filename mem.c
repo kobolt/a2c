@@ -698,20 +698,18 @@ void mem_write(mem_t *mem, uint16_t address, uint8_t value)
   } else if (address < 0xD000) { /* INTCXROM */
     /* Read-Only ROM! */
 
-  } else { /* $D000 Area */
-    if (mem->lcram == true) { /* RAM */
-      if (mem->wp == false) {
-        if (address < 0xE000 && mem->bnk2 == false) {
-          address -= 0x1000;
-        }
-        if (mem->alt_zp == false) {
-          mem->main[address] = value;
-        } else {
-          mem->aux[address] = value;
-        }
-      } else {
-        panic("Write protected RAM address $%04x ($%02x)\n", address, value);
+  } else { /* $D000 Area (Always RAM) */
+    if (mem->wp == false) {
+      if (address < 0xE000 && mem->bnk2 == false) {
+        address -= 0x1000;
       }
+      if (mem->alt_zp == false) {
+        mem->main[address] = value;
+      } else {
+        mem->aux[address] = value;
+      }
+    } else {
+      panic("Write protected RAM address $%04x ($%02x)\n", address, value);
     }
   }
 }

@@ -60,13 +60,16 @@ void panic(const char *format, ...)
 
 static void display_help(const char *progname)
 {
-  fprintf(stdout, "Usage: %s <options> [floppy-disk-image]\n", progname);
+  fprintf(stdout,
+    "Usage: %s <options> [floppy-disk-image-1] [floppy-disk-image-2]\n",
+    progname);
   fprintf(stdout, "Options:\n"
      "  -h        Display this help.\n"
      "  -b        Break into debugger on start.\n"
      "  -w        Warp (full speed) mode.\n"
      "  -r FILE   Use FILE for ROM instead of the default.\n"
-     "  -t TYPE   Force override TYPE of floppy disk image.\n"
+     "  -t TYPE   Force override TYPE of floppy disk image for drive #1.\n"
+     "  -T TYPE   Force override TYPE of floppy disk image for drive #2.\n"
      "  -s TTY    Assign TTY device for ACIA 2 communication.\n"
 #ifdef HIRES_GUI_WINDOW
      "  -g        Run a window for HiRes graphics output in parallel.\n"
@@ -93,12 +96,14 @@ int main(int argc, char *argv[])
   int c;
   int count = 0;
   char *rom_filename = DEFAULT_ROM_FILENAME;
-  char *disk_filename = NULL;
+  char *disk_filename_1 = NULL;
+  char *disk_filename_2 = NULL;
   char *tty_device = NULL;
-  int disk_type = 0;
+  int disk_type_1 = 0;
+  int disk_type_2 = 0;
   bool gui_enable = false;
 
-  while ((c = getopt(argc, argv, "hbwr:t:s:g")) != -1) {
+  while ((c = getopt(argc, argv, "hbwr:t:T:s:g")) != -1) {
     switch (c) {
     case 'h':
       display_help(argv[0]);
@@ -117,7 +122,11 @@ int main(int argc, char *argv[])
       break;
 
     case 't':
-      disk_type = atoi(optarg);
+      disk_type_1 = atoi(optarg);
+      break;
+
+    case 'T':
+      disk_type_2 = atoi(optarg);
       break;
 
     case 's':
@@ -138,7 +147,10 @@ int main(int argc, char *argv[])
   }
 
   if (argc > optind) {
-    disk_filename = argv[optind];
+    disk_filename_1 = argv[optind];
+    if (argc > (optind + 1)) {
+      disk_filename_2 = argv[optind + 1];
+    }
   }
 
   w65c02_trace_init();
@@ -156,9 +168,16 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
-  if (disk_filename != NULL) {
-    if (iwm_disk_load(&iwm, 0, disk_filename, disk_type) != 0) {
-      fprintf(stdout, "Loading of disk image '%s' failed!\n", disk_filename);
+  if (disk_filename_1 != NULL) {
+    if (iwm_disk_load(&iwm, 0, disk_filename_1, disk_type_1) != 0) {
+      fprintf(stdout, "Loading of disk image '%s' failed!\n", disk_filename_1);
+      return EXIT_FAILURE;
+    }
+  }
+
+  if (disk_filename_2 != NULL) {
+    if (iwm_disk_load(&iwm, 1, disk_filename_2, disk_type_2) != 0) {
+      fprintf(stdout, "Loading of disk image '%s' failed!\n", disk_filename_2);
       return EXIT_FAILURE;
     }
   }
