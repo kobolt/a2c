@@ -34,5 +34,6 @@ Verson history:
 
 Links:
 * [Blog: Apple IIc Emulator](https://kobolt.github.io/article-251.html)
+* [Blog: Apple IIc Emulator Update](https://kobolt.github.io/article-272.html)
 * [YouTube: Apple IIc Emulator for the Linux Terminal](https://www.youtube.com/watch?v=qiS9BPXTqXg)
 
